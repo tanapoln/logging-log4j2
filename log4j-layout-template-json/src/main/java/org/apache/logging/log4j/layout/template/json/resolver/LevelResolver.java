@@ -21,11 +21,6 @@ import org.apache.logging.log4j.core.LogEvent;
 import org.apache.logging.log4j.core.net.Severity;
 import org.apache.logging.log4j.layout.template.json.util.JsonWriter;
 
-import java.util.Arrays;
-import java.util.Map;
-import java.util.function.Function;
-import java.util.stream.Collectors;
-
 /**
  * {@link Level} resolver.
  *
@@ -111,15 +106,14 @@ public final class LevelResolver implements EventResolver {
     private static EventResolver createResolver(
             final EventResolverContext context,
             final TemplateResolverConfig config) {
-        final JsonWriter jsonWriter = context.getJsonWriter();
         final String fieldName = config.getString("field");
         if ("name".equals(fieldName)) {
-            return createNameResolver(jsonWriter);
+            return createNameResolver();
         } else if ("severity".equals(fieldName)) {
             final String severityFieldName =
                     config.getString(new String[]{"severity", "field"});
             if ("keyword".equals(severityFieldName)) {
-                return createSeverityKeywordResolver(jsonWriter);
+                return createSeverityKeywordResolver();
             } else if ("code".equals(severityFieldName)) {
                 return SEVERITY_CODE_RESOLVER;
             }
@@ -129,34 +123,16 @@ public final class LevelResolver implements EventResolver {
         throw new IllegalArgumentException("unknown field: " + config);
     }
 
-    private static EventResolver createNameResolver(
-            final JsonWriter contextJsonWriter) {
-        final Map<Level, String> resolutionByLevel = Arrays
-                .stream(Level.values())
-                .collect(Collectors.toMap(
-                        Function.identity(),
-                        (final Level level) -> contextJsonWriter.use(() -> {
-                            final String name = level.name();
-                            contextJsonWriter.writeString(name);
-                        })));
+    private static EventResolver createNameResolver() {
         return (final LogEvent logEvent, final JsonWriter jsonWriter) -> {
-            final String resolution = resolutionByLevel.get(logEvent.getLevel());
+            final String resolution = logEvent.getLevel().name();
             jsonWriter.writeRawString(resolution);
         };
     }
 
-    private static EventResolver createSeverityKeywordResolver(
-            final JsonWriter contextJsonWriter) {
-        final Map<Level, String> resolutionByLevel = Arrays
-                .stream(Level.values())
-                .collect(Collectors.toMap(
-                        Function.identity(),
-                        (final Level level) -> contextJsonWriter.use(() -> {
-                            final String severityKeyword = Severity.getSeverity(level).name();
-                            contextJsonWriter.writeString(severityKeyword);
-                        })));
+    private static EventResolver createSeverityKeywordResolver() {
         return (final LogEvent logEvent, final JsonWriter jsonWriter) -> {
-            final String resolution = resolutionByLevel.get(logEvent.getLevel());
+            final String resolution = Severity.getSeverity(logEvent.getLevel()).name();
             jsonWriter.writeRawString(resolution);
         };
     }

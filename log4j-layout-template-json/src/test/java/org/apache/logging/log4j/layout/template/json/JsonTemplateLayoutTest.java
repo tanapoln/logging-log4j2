@@ -16,45 +16,6 @@
  */
 package org.apache.logging.log4j.layout.template.json;
 
-import com.fasterxml.jackson.databind.JsonNode;
-import com.fasterxml.jackson.databind.MappingIterator;
-import com.fasterxml.jackson.databind.ObjectMapper;
-import org.apache.logging.log4j.Level;
-import org.apache.logging.log4j.Marker;
-import org.apache.logging.log4j.MarkerManager;
-import org.apache.logging.log4j.core.LogEvent;
-import org.apache.logging.log4j.core.appender.SocketAppender;
-import org.apache.logging.log4j.core.config.Configuration;
-import org.apache.logging.log4j.core.config.builder.api.ConfigurationBuilderFactory;
-import org.apache.logging.log4j.plugins.Plugin;
-import org.apache.logging.log4j.plugins.PluginFactory;
-import org.apache.logging.log4j.core.impl.Log4jLogEvent;
-import org.apache.logging.log4j.core.layout.ByteBufferDestination;
-import org.apache.logging.log4j.core.lookup.MainMapLookup;
-import org.apache.logging.log4j.core.net.Severity;
-import org.apache.logging.log4j.core.time.MutableInstant;
-import org.apache.logging.log4j.layout.template.json.JsonTemplateLayout.EventTemplateAdditionalField;
-import org.apache.logging.log4j.layout.template.json.resolver.EventResolver;
-import org.apache.logging.log4j.layout.template.json.resolver.EventResolverContext;
-import org.apache.logging.log4j.layout.template.json.resolver.EventResolverFactory;
-import org.apache.logging.log4j.layout.template.json.resolver.TemplateResolver;
-import org.apache.logging.log4j.layout.template.json.resolver.TemplateResolverConfig;
-import org.apache.logging.log4j.layout.template.json.resolver.TemplateResolverFactory;
-import org.apache.logging.log4j.layout.template.json.util.JsonWriter;
-import org.apache.logging.log4j.message.Message;
-import org.apache.logging.log4j.message.MessageFactory;
-import org.apache.logging.log4j.message.ObjectMessage;
-import org.apache.logging.log4j.message.ParameterizedMessageFactory;
-import org.apache.logging.log4j.message.ReusableMessageFactory;
-import org.apache.logging.log4j.message.SimpleMessage;
-import org.apache.logging.log4j.message.StringMapMessage;
-import org.apache.logging.log4j.core.test.AvailablePortFinder;
-import org.apache.logging.log4j.util.SortedArrayStringMap;
-import org.apache.logging.log4j.util.StringMap;
-import org.apache.logging.log4j.util.Strings;
-import org.assertj.core.api.Assertions;
-import org.junit.jupiter.api.Test;
-
 import java.io.ByteArrayOutputStream;
 import java.io.EOFException;
 import java.io.IOException;
@@ -81,6 +42,46 @@ import java.util.concurrent.TimeUnit;
 import java.util.concurrent.atomic.AtomicInteger;
 import java.util.stream.Collectors;
 import java.util.stream.IntStream;
+
+import org.apache.logging.log4j.Level;
+import org.apache.logging.log4j.Marker;
+import org.apache.logging.log4j.MarkerManager;
+import org.apache.logging.log4j.core.LogEvent;
+import org.apache.logging.log4j.core.appender.SocketAppender;
+import org.apache.logging.log4j.core.config.Configuration;
+import org.apache.logging.log4j.core.config.builder.api.ConfigurationBuilderFactory;
+import org.apache.logging.log4j.core.impl.Log4jLogEvent;
+import org.apache.logging.log4j.core.layout.ByteBufferDestination;
+import org.apache.logging.log4j.core.lookup.MainMapLookup;
+import org.apache.logging.log4j.core.net.Severity;
+import org.apache.logging.log4j.core.test.AvailablePortFinder;
+import org.apache.logging.log4j.core.time.MutableInstant;
+import org.apache.logging.log4j.layout.template.json.JsonTemplateLayout.EventTemplateAdditionalField;
+import org.apache.logging.log4j.layout.template.json.resolver.EventResolver;
+import org.apache.logging.log4j.layout.template.json.resolver.EventResolverContext;
+import org.apache.logging.log4j.layout.template.json.resolver.EventResolverFactory;
+import org.apache.logging.log4j.layout.template.json.resolver.TemplateResolver;
+import org.apache.logging.log4j.layout.template.json.resolver.TemplateResolverConfig;
+import org.apache.logging.log4j.layout.template.json.resolver.TemplateResolverFactory;
+import org.apache.logging.log4j.layout.template.json.util.JsonWriter;
+import org.apache.logging.log4j.message.Message;
+import org.apache.logging.log4j.message.MessageFactory;
+import org.apache.logging.log4j.message.ObjectMessage;
+import org.apache.logging.log4j.message.ParameterizedMessageFactory;
+import org.apache.logging.log4j.message.ReusableMessageFactory;
+import org.apache.logging.log4j.message.SimpleMessage;
+import org.apache.logging.log4j.message.StringMapMessage;
+import org.apache.logging.log4j.plugins.Plugin;
+import org.apache.logging.log4j.plugins.PluginFactory;
+import org.apache.logging.log4j.util.SortedArrayStringMap;
+import org.apache.logging.log4j.util.StringMap;
+import org.apache.logging.log4j.util.Strings;
+import org.assertj.core.api.Assertions;
+import org.junit.jupiter.api.Test;
+
+import com.fasterxml.jackson.databind.JsonNode;
+import com.fasterxml.jackson.databind.MappingIterator;
+import com.fasterxml.jackson.databind.ObjectMapper;
 
 import static org.apache.logging.log4j.layout.template.json.TestHelpers.CONFIGURATION;
 import static org.apache.logging.log4j.layout.template.json.TestHelpers.asMap;
@@ -1540,23 +1541,46 @@ class JsonTemplateLayoutTest {
         final long instantEpochMillis = Instant.parse(formattedInstant).toEpochMilli();
         final MutableInstant instant = new MutableInstant();
         instant.initFromEpochMilli(instantEpochMillis, 0);
-        return Log4jLogEvent
-                .newBuilder()
-                .setLoggerName(LOGGER_NAME)
-                .setMessage(message)
-                .setInstant(instant)
+        return Log4jLogEvent.newBuilder().setLoggerName(LOGGER_NAME).setMessage(message).setInstant(instant).build();
+    }
+
+    @Test
+    void test_level_dynamic() {
+
+        // Create the event template.
+        final String eventTemplate = writeJson(asMap("logLevel", asMap("$resolver", "level"), "severityKeyword",
+                asMap("$resolver", "level", "field", "severity", "severity", asMap("field", "keyword")), "severityCode",
+                asMap("$resolver", "level", "field", "severity", "severity", asMap("field", "code"))));
+
+        // Create the layout.
+        final JsonTemplateLayout layout = JsonTemplateLayout.newBuilder().setConfiguration(CONFIGURATION)
+                .setEventTemplate(eventTemplate).build();
+
+        Level customLevel = Level.forName("CUSTOM", Level.INFO.intLevel() + 1);
+        Severity severity = Severity.getSeverity(customLevel);
+
+        final SimpleMessage message = new SimpleMessage("Hello, World!");
+        final LogEvent logEvent = Log4jLogEvent.newBuilder().setLoggerName(LOGGER_NAME).setLevel(customLevel).setMessage(message)
                 .build();
+
+        // Check the serialized event.
+        usingSerializedLogEventAccessor(layout, logEvent, accessor -> {
+            final String expectedLevelName = customLevel.name();
+            final String expectedSeverityKeyword = severity.name();
+            final int expectedSeverityCode = severity.getCode();
+            assertThat(accessor.getString("logLevel")).isEqualTo(expectedLevelName);
+            assertThat(accessor.getString("severityKeyword")).isEqualTo(expectedSeverityKeyword);
+            assertThat(accessor.getInteger("severityKeyword")).isEqualTo(expectedSeverityCode);
+        });
+
     }
 
     @Test
     void test_level_severity() {
 
         // Create the event template.
-        final String eventTemplate = writeJson(asMap(
-                "severityKeyword", asMap(
-                        "$resolver", "level",
-                        "field", "severity",
-                        "severity", asMap("field", "keyword")),
+        final String eventTemplate = writeJson(
+                asMap("severityKeyword", asMap("$resolver", "level", "field", "severity", "severity", asMap("field", "keyword")),
                 "severityCode", asMap(
                         "$resolver", "level",
                         "field", "severity",
